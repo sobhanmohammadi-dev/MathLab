@@ -1,0 +1,243 @@
+<!DOCTYPE html>
+<html lang="fa" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>مثلث پویا با حل سرور</title>
+    <link rel="stylesheet" href="css/jsxgraph.css">
+    <style>
+        body {
+            font-family: Tahoma, sans-serif;
+            background: #f4f7fc;
+            margin: 0;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        .container {
+            background: white;
+            padding: 30px;
+            border-radius: 15px;
+            box-shadow: 0 8px 20px rgba(0,0,0,0.1);
+            text-align: center;
+            max-width: 800px;
+            width: 100%;
+        }
+
+        .input-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 15px;
+            margin-bottom: 25px;
+        }
+
+        label {
+            font-size: 16px;
+            font-weight: bold;
+            color: #2c3e50;
+        }
+
+        input[type="number"] {
+            width: 80%;
+            padding: 8px;
+            font-size: 16px;
+            border: 2px solid #3498db;
+            border-radius: 8px;
+            text-align: center;
+        }
+
+        select {
+            padding: 8px;
+            font-size: 14px;
+            border-radius: 8px;
+            border: 2px solid #3498db;
+        }
+
+        button {
+            background-color: #3498db;
+            color: white;
+            border: none;
+            padding: 12px 30px;
+            font-size: 16px;
+            border-radius: 8px;
+            cursor: pointer;
+            margin-top: 15px;
+            transition: background 0.3s;
+        }
+
+        button:hover {
+            background-color: #2980b9;
+        }
+
+        #box {
+            width: 100%;
+            height: 500px;
+            margin-top: 20px;
+            border: 1px solid #ddd;
+            border-radius: 10px;
+        }
+
+        .message {
+            margin-top: 10px;
+            font-size: 16px;
+            font-weight: bold;
+            color: #e74c3c;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h2>📐 محاسبه مثلث با یک پارامتر مجهول</h2>
+        <p>یک پارامتر (ضلع یا زاویه) را به‌عنوان مجهول انتخاب کنید، بقیه را مقداردهی کنید.</p>
+        
+        <label>پارامتر مجهول:</label>
+        <select id="unknownSelect">
+            <option value="a">ضلع a</option>
+            <option value="b">ضلع b</option>
+            <option value="c">ضلع c</option>
+            <option value="A">زاویه A</option>
+            <option value="B">زاویه B</option>
+            <option value="C">زاویه C</option>
+        </select>
+
+        <div class="input-grid">
+            <div>
+                <label>ضلع a</label>
+                <input type="number" id="sideA" step="any" placeholder="مجهول" disabled>
+            </div>
+            <div>
+                <label>ضلع b</label>
+                <input type="number" id="sideB" step="any" placeholder="مقدار">
+            </div>
+            <div>
+                <label>ضلع c</label>
+                <input type="number" id="sideC" step="any" placeholder="مقدار">
+            </div>
+            <div>
+                <label>زاویه A (درجه)</label>
+                <input type="number" id="angleA" step="any" placeholder="مقدار">
+            </div>
+            <div>
+                <label>زاویه B (درجه)</label>
+                <input type="number" id="angleB" step="any" placeholder="مقدار">
+            </div>
+            <div>
+                <label>زاویه C (درجه)</label>
+                <input type="number" id="angleC" step="any" placeholder="مقدار">
+            </div>
+        </div>
+
+        <button id="calcBtn">محاسبه و رسم</button>
+        <div id="message" class="message"></div>
+        <div id="box"></div>
+    </div>
+
+    <script src="js/jsxgraphcore.js"></script>
+    <script>
+        const unknownSelect = document.getElementById('unknownSelect');
+        const inputs = {
+            a: document.getElementById('sideA'),
+            b: document.getElementById('sideB'),
+            c: document.getElementById('sideC'),
+            A: document.getElementById('angleA'),
+            B: document.getElementById('angleB'),
+            C: document.getElementById('angleC')
+        };
+
+        // غیرفعال کردن فیلد مجهول
+        function updateDisabled() {
+            const unknown = unknownSelect.value;
+            for (let key in inputs) {
+                inputs[key].disabled = (key === unknown);
+                if (key === unknown) inputs[key].value = '';
+            }
+        }
+        unknownSelect.addEventListener('change', updateDisabled);
+        updateDisabled(); // حالت اولیه
+
+        // رسم مثلث با اضلاع (a,b,c) - a مقابل A، b مقابل B، c مقابل C
+        function drawTriangle(sides) {
+            const { a, b, c } = sides;
+            const boxDiv = document.getElementById('box');
+            boxDiv.innerHTML = '';
+
+            // مقیاس‌بندی برای جا شدن در برد
+            const maxSide = Math.max(a, b, c);
+            const bound = maxSide * 1.5;
+            const board = JXG.JSXGraph.initBoard('box', {
+                boundingbox: [-0.5, bound, bound, -0.5],
+                axis: true,
+                grid: true,
+                showNavigation: true,
+                showCopyright: false
+            });
+
+            // نقاط: A=(0,0), B=(c,0) و C با محاسبات
+            const A = board.create('point', [0, 0], { name: 'A', fixed: true });
+            const B = board.create('point', [c, 0], { name: 'B', fixed: true });
+            const x = (b * b + c * c - a * a) / (2 * c);
+            const y = Math.sqrt(b * b - x * x);
+            const C = board.create('point', [x, y], { name: 'C', fixed: true });
+
+            board.create('polygon', [A, B, C], {
+                borders: { strokeWidth: 2, strokeColor: '#2c3e50' },
+                fillColor: '#ecf0f1',
+                fillOpacity: 0.6
+            });
+
+            // نمایش طول اضلاع
+            board.create('text', [c/2, -0.2, `c = ${c.toFixed(2)}`], { fontSize: 14 });
+            board.create('text', [x/2, y/2, `b = ${b.toFixed(2)}`], { fontSize: 14 });
+            board.create('text', [(x+c)/2, y/2, `a = ${a.toFixed(2)}`], { fontSize: 14 });
+        }
+
+        document.getElementById('calcBtn').addEventListener('click', async () => {
+            const unknown = unknownSelect.value;
+            const data = {
+                sides: {
+                    a: inputs.a.value ? parseFloat(inputs.a.value) : null,
+                    b: inputs.b.value ? parseFloat(inputs.b.value) : null,
+                    c: inputs.c.value ? parseFloat(inputs.c.value) : null
+                },
+                angles: {
+                    A: inputs.A.value ? parseFloat(inputs.A.value) : null,
+                    B: inputs.B.value ? parseFloat(inputs.B.value) : null,
+                    C: inputs.C.value ? parseFloat(inputs.C.value) : null
+                }
+            };
+
+            // اعتبارسنجی ساده
+            const msgDiv = document.getElementById('message');
+            msgDiv.textContent = '';
+
+            try {
+                const response = await fetch('/solve', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(data)
+                });
+                const result = await response.json();
+                if (!result.success) {
+                    msgDiv.textContent = result.message;
+                    return;
+                }
+
+                // به‌روزرسانی فیلدها با مقادیر محاسبه شده
+                const solved = result.data;
+                for (let key in inputs) {
+                    const sideKey = key.toLowerCase();
+                    if (key in solved.sides) inputs[key].value = solved.sides[key].toFixed(2);
+                    if (key in solved.angles) inputs[key].value = solved.angles[key].toFixed(2);
+                }
+
+                // رسم مثلث
+                drawTriangle(solved.sides);
+            } catch (err) {
+                msgDiv.textContent = 'خطا در ارتباط با سرور';
+            }
+        });
+    </script>
+</body>
+</html>

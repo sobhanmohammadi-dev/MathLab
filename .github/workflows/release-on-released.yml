@@ -1,0 +1,206 @@
+name: Release on version change
+
+on:
+  push:
+    branches:
+      - master
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Detect and create releases
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+
+          echo "========================================="
+          echo "Fetching latest GitHub release info..."
+          echo "========================================="
+
+          # Get latest release tag (if any)
+          LATEST_TAG=$(gh release list --limit 1 --json tagName -q '.[0].tagName' 2>/dev/null || echo "")
+          if [ -n "$LATEST_TAG" ]; then
+            # Strip leading 'v' to get version string
+            LATEST_VERSION="${LATEST_TAG#v}"
+            # Get the commit SHA that the release points to
+            PREV_RELEASE=$(gh release view "$LATEST_TAG" --json targetCommitish -q '.targetCommitish' 2>/dev/null || echo "")
+            echo "Latest release: $LATEST_TAG (version $LATEST_VERSION) on commit $PREV_RELEASE"
+          else
+            LATEST_VERSION=""
+            PREV_RELEASE=""
+            echo "No previous release found."
+          fi
+
+          echo ""
+          echo "========================================="
+          echo "Processing push commits..."
+          echo "========================================="
+
+          BEFORE="${{ github.event.before }}"
+          AFTER="${{ github.event.after }}"
+
+          # Extract non-merge commits from the push event itself (avoids range errors)
+          ALL_EVENT_COMMITS=$(jq -r '.commits[].id // empty' "$GITHUB_EVENT_PATH")
+          if [ -z "$ALL_EVENT_COMMITS" ]; then
+            echo "No commits in push event. Exiting."
+            exit 0
+          fi
+
+          echo "All commits in this push:"
+          echo "$ALL_EVENT_COMMITS" | while read sha; do echo "  $sha"; done
+
+          # Filter out merge commits
+          echo "Filtering out merge commits..."
+          PUSH_COMMITS=""
+          for sha in $ALL_EVENT_COMMITS; do
+            if git log -1 --no-merges "$sha" >/dev/null 2>&1; then
+              PUSH_COMMITS="$PUSH_COMMITS $sha"
+              echo "  $sha is a non‑merge commit"
+            else
+              echo "  $sha is a merge commit, skipping"
+            fi
+          done
+
+          PUSH_COMMITS=$(echo "$PUSH_COMMITS" | xargs)  # trim extra spaces
+          if [ -z "$PUSH_COMMITS" ]; then
+            echo "No non‑merge commits in this push. Exiting."
+            exit 0
+          fi
+
+          echo "Non‑merge commits to inspect (in event order):"
+          for sha in $PUSH_COMMITS; do
+            echo "  $sha"
+          done
+
+          # Process each commit in chronological order
+          for sha in $PUSH_COMMITS; do
+            echo ""
+            echo "-----------------------------------------"
+            echo "Inspecting commit $sha..."
+
+            # Extract version from version.txt at this commit
+            if ! git cat-file -e "$sha:version.txt" 2>/dev/null; then
+              echo "version.txt not found in commit $sha → skipping."
+              continue
+            fi
+            VERSION=$(git show "$sha:version.txt" | head -1 | tr -d '[:space:]')
+            echo "Version in commit: '$VERSION'"
+
+            # Validate version format
+            VERSION_REGEX='^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+(-[a-zA-Z0-9]+)?$'
+            if ! echo "$VERSION" | grep -Eq "$VERSION_REGEX"; then
+              echo "ERROR: Invalid version format: '$VERSION'" >&2
+              exit 1
+            fi
+
+            # Check if version changed from latest release
+            if [ "$VERSION" = "$LATEST_VERSION" ]; then
+              echo "Version '$VERSION' is the same as latest release → skipping."
+              continue
+            fi
+
+            echo ""
+            echo ">>> Version changed! (latest: ${LATEST_VERSION:-none}, new: $VERSION)"
+            echo ">>> Creating release for commit $sha."
+
+            # If tag already exists, skip (should not happen, but safety)
+            if git rev-parse "v$VERSION" >/dev/null 2>&1; then
+              echo "Tag v$VERSION already exists. Skipping."
+              continue
+            fi
+
+            # Determine commit range for changelog
+            if [ -z "$PREV_RELEASE" ]; then
+              echo "No previous release → gathering all commits up to $sha"
+              RANGE_COMMITS=$(git rev-list --no-merges --reverse "$sha" 2>/dev/null || echo "")
+            else
+              echo "Previous release commit: $PREV_RELEASE"
+              echo "Gathering commits after $PREV_RELEASE up to $sha"
+              RANGE_COMMITS=$(git rev-list --no-merges --reverse "${PREV_RELEASE}..${sha}" 2>/dev/null || echo "")
+            fi
+
+            if [ -z "$RANGE_COMMITS" ]; then
+              echo "WARNING: No commits found in range. Changelog will be minimal."
+              RANGE_COMMITS=""
+            else
+              echo "Commits in changelog range:"
+              for c in $RANGE_COMMITS; do echo "  $c"; done
+            fi
+
+            # Generate changelog file
+            CHANGELOG_FILE="changelog-${VERSION}.md"
+            echo "Generating changelog: $CHANGELOG_FILE"
+            {
+              echo "# Changelog for MathLab v${VERSION}"
+              echo ""
+            } > "$CHANGELOG_FILE"
+
+            for commit in $RANGE_COMMITS; do
+              short=$(git rev-parse --short "$commit")
+              message=$(git log -1 --format="%B" "$commit")
+              stat=$(git show --stat --format="" "$commit" 2>/dev/null || echo "")
+
+              echo "" >> "$CHANGELOG_FILE"
+              echo "### Commit $short" >> "$CHANGELOG_FILE"
+              echo "" >> "$CHANGELOG_FILE"
+              echo "$message" >> "$CHANGELOG_FILE"
+              echo "" >> "$CHANGELOG_FILE"
+              if [ -n "$stat" ]; then
+                echo '```diff' >> "$CHANGELOG_FILE"
+                echo "$stat" >> "$CHANGELOG_FILE"
+                echo '```' >> "$CHANGELOG_FILE"
+              fi
+            done
+            echo "" >> "$CHANGELOG_FILE"
+            echo "Changelog created."
+
+            # Prepare release notes from description.txt (Markdown)
+            NOTES_FILE="release-notes-${VERSION}.md"
+            if git cat-file -e "$sha:description.txt" 2>/dev/null; then
+              git show "$sha:description.txt" > "$NOTES_FILE"
+              echo "Release notes loaded from description.txt"
+            else
+              echo "(No description.txt found)" > "$NOTES_FILE"
+              echo "description.txt not found in commit; release notes will be minimal."
+            fi
+
+            # Append auto-generation notice with a blank line before it
+            echo "" >> "$NOTES_FILE"
+            echo "This release was automatically created by a GitHub workflow/action." >> "$NOTES_FILE"
+            echo "Release notes written to $NOTES_FILE"
+
+            # Prerelease flag
+            PRERELEASE_FLAG=""
+            if echo "$VERSION" | grep -qiE 'alpha|beta'; then
+              PRERELEASE_FLAG="--prerelease"
+              echo "Pre‑release flag set (version contains alpha/beta)."
+            fi
+
+            echo "Creating GitHub release v${VERSION}..."
+            gh release create "v${VERSION}" "$CHANGELOG_FILE" \
+              --title "MathLab ${VERSION}" \
+              --notes-file "$NOTES_FILE" \
+              --target "$sha" \
+              $PRERELEASE_FLAG
+
+            echo "Release v${VERSION} created successfully!"
+
+            # Update tracking variables for next commit in the same push
+            LATEST_VERSION="$VERSION"
+            PREV_RELEASE="$sha"
+          done
+
+          echo "========================================="
+          echo "All releases processed."
+          echo "========================================="
