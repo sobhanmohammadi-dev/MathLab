@@ -155,7 +155,7 @@ if (!$res['ok']) {
     http_response_code(422);
     echo json_encode([
         'valid'         => false,
-        'error'         => $friendlyMsg,       // user-friendly translated message
+        'error'         => $friendlyMsg, 
         'error_raw'     => $errMsg,            // technical detail (logged, available for debug)
         'error_type'    => $errType,
         'code'          => 422,

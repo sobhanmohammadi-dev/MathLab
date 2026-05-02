@@ -6,7 +6,7 @@ declare(strict_types=1);
 if (isset($_REQUEST['equation'])) {
   // Prevent HTML error pages leaking into the JSON stream
   ini_set('display_errors', '0');
-  require __DIR__ . '/calculate.php';
+  require __DIR__ . '/app/calculate.php';
   exit;
 }
 

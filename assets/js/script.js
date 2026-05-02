@@ -102,6 +102,7 @@ const I18n = {
             'validation.exprMode': 'محاسبه عبارت (بدون مساوی)',
             'validation.inFracNum': 'در صورت کسر', 'validation.inFracDen': 'در مخرج کسر',
             'validation.inBase': 'در پایه توان', 'validation.inExp': 'در توان', 'validation.inRadical': 'در رادیکال',
+            'validation.errorsCount': 'ما x خطا در این مسئله داریم، لطفا آن هارا درست کنید.',
             'results.title': 'نتیجه محاسبه', 'results.answer': 'پاسخ نهایی',
             'results.prev': 'قبلی', 'results.next': 'بعدی', 'results.play': 'پخش', 'results.pause': 'مکث',
             'results.replay': 'بازپخش', 'results.close': 'بستن',
@@ -161,7 +162,7 @@ const I18n = {
             'details.desc.closeParen': 'پرانتز بسته برای گروه‌بندی.',
             'details.desc.fraction': 'کسر: شامل صورت و مخرج.',
             'details.desc.power': 'توان: شامل پایه و نما.',
-            'details.desc.radical': 'رادیکال: محاسبهٔ ریشهٔ دوم عبارت درون آن.',
+            'details.desc.radical': 'رادیکال: محاسبهٔ ریشهٔ دوم عبارت درون آن.'
         },
         en: {
             'app.title': 'MathLab', 'app.subtitle': 'Math Workspace',
@@ -198,6 +199,7 @@ const I18n = {
             'validation.exprMode': 'Expression mode (no equals sign)',
             'validation.inFracNum': 'In numerator', 'validation.inFracDen': 'In denominator',
             'validation.inBase': 'In base', 'validation.inExp': 'In exponent', 'validation.inRadical': 'In radical',
+            'validation.errorsCount': 'We have x errors in this expression, pls fix it.',
             'results.title': 'Solution', 'results.answer': 'Final Answer',
             'results.prev': 'Prev', 'results.next': 'Next', 'results.play': 'Play', 'results.pause': 'Pause',
             'results.replay': 'Replay', 'results.close': 'Close',
@@ -257,7 +259,7 @@ const I18n = {
             'details.desc.closeParen': 'Closing parenthesis for grouping.',
             'details.desc.fraction': 'Fraction: consists of numerator and denominator.',
             'details.desc.power': 'Power: consists of base and exponent.',
-            'details.desc.radical': 'Square root of the contained expression.',
+            'details.desc.radical': 'Square root of the contained expression.'        
         }
     },
 
@@ -2071,7 +2073,11 @@ const App = {
         if (!State.tokens.length) { this.showStatus(I18n.t('validation.empty'), 'error'); return; }
         const issues = Validator.validate(State.tokens);
         const errors = issues.filter(i => i.level === 'error');
-        if (errors.length) { this.showStatus(`✕ ${errors.length} error${errors.length > 1 ? 's' : ''}`, 'error'); return; }
+        if (errors.length) {
+            const msg = I18n.t('validation.errorsCount').replace('x', errors.length);
+            this.showStatus(msg, 'error');
+            return;
+        }
 
         const eq = this._buildEq();
         const btn = document.getElementById('calculateBtn');
