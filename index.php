@@ -5,7 +5,7 @@ declare(strict_types=1);
 // ── API mode: if 'equation' param present, route to backend and exit ──
 if (isset($_REQUEST['equation'])) {
   // Prevent HTML error pages leaking into the JSON stream
-  ini_set('display_errors', '0');
+  ini_set('display_errors', '1');
   require __DIR__ . '/app/calculate.php';
   exit;
 }
@@ -197,6 +197,10 @@ header_remove('X-Powered-By');
         </button>
         <span class="status" id="status"></span>
       </div>
+        <label>
+            <input type="checkbox" id="humanmodeToggle" />
+            حالت نمادین
+        </label>
     </main>
   </div>
 

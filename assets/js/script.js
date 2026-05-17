@@ -2083,9 +2083,11 @@ const App = {
         const btn = document.getElementById('calculateBtn');
 
         // Build POST body: expression + language + variables
+        const hm = document.getElementById('humanmodeToggle')?.checked ?? false;
         const params = new URLSearchParams({
             equation: eq,
             lang: I18n.lang,
+            humanmode: hm ? '1' : '0',
         });
         Object.entries(State.varValues).forEach(([k, v]) => {
             if (v !== '' && !isNaN(parseFloat(v))) params.append('vars[' + k + ']', v);
