@@ -85,7 +85,7 @@ The backend calculation engine relies on our dedicated Composer package. You mus
 
 ```bash
 # Clone the repository
-git clone [https://github.com/sobhanmohammadi-dev/MathLab.git](https://github.com/sobhanmohammadi-dev/MathLab.git)
+git clone https://github.com/sobhanmohammadi-dev/MathLab.git
 cd MathLab
 
 # Navigate to the app directory and install dependencies
