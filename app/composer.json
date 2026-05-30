@@ -1,5 +1,5 @@
 {
     "require": {
-        "sobhanmohammadi/cas": "^1.1"
+        "sobhanmohammadi/cas": "^2.0.2"
     }
 }

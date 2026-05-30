@@ -1,4 +1,4 @@
 # MathLab Project
 
-This is a web‑based project using PHP for the Kharazmi Festival.  
-The project has been started – stay tuned for awesome updates!
+ In this update we add and fix a lot of thing in library,
+You can go to library and see.
